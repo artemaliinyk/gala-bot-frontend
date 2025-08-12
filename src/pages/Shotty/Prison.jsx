@@ -15,21 +15,23 @@ export default function Prison() {
   const [planet, setPlanet] = useState(null);
 
   const [whiteNickNames, setWhiteNickNames] = useState([
-      "youdnok",
+    "elichka",
   ])
 
   const [whiteClans, setWhiteClans] = useState([
     "KO",
-    "Shotty",
   ])
 
   const [canPrisonUsers, setCanPrisonUsers] = useState(null)
 
+  const [account, setAccount] = useState(null);
+  const accountRef = useRef(null);
+
   useEffect(() => {
-        if (recoverCode.trim()) {
-            handleLogin();
-        }
-    }, []);
+    if (recoverCode.trim()) {
+        handleLogin();
+    }
+  }, []);
 
   useEffect(() => {
     const offOpen = client.on("open", () => setConnected(true));
@@ -37,6 +39,13 @@ export default function Prison() {
     const offClose = client.on("close", () => {
         setConnected(false);
         setAuthOk(false);
+    });
+
+     const offAccount = client.on("ACCOUNT", ({ id, nick }) => {
+          const acc = { id: String(id), nick };
+          accountRef.current = acc;
+          setAccount(acc);
+          setUsers(prev => prev.map(u => ({ ...u, is_me: isMe(u) })));
     });
 
     const offAuth = client.on("auth_ok", () => {
@@ -80,7 +89,8 @@ export default function Prison() {
         users.filter(user =>
             !whiteNickNames.includes(user.nick) &&
             !whiteClans.includes(user.clan) &&
-            !user?.is_owner
+            !user?.is_owner &&
+            !user?.is_me
         )
     );
   }, [users, whiteNickNames, whiteClans]);
@@ -91,10 +101,22 @@ export default function Prison() {
     }
   }, [canPrisonUsers]);
 
+  useEffect(() => {
+    if (!accountRef.current) return;
+    setUsers(prev => prev.map(u => ({ ...u, is_me: isMe(u) })));
+  }, [account]);
+
+  const isMe = (u) => {
+    const acc = accountRef.current;
+    if (!acc) return false;
+
+    return (u.id && acc.id && String(u.id) === String(acc.id)) || (u.nick && acc.nick && normalizeNick(u.nick) === normalizeNick(acc.nick));
+  }
+
   const collectionUsers = (head, line, lineSplit) => {
     // Users already on Planet: 353
     if (head === "353") {
-        const regex = /([:@\w]+)\s+([^\s]+)\s+(\d{5,})/g;
+        const regex = /(\S+)\s+(\S+)\s+(\d{5,})/gu;
         const batchMap = new Map();
         let match;
 
@@ -111,7 +133,9 @@ export default function Prison() {
             const map = new Map(prev.map(u => [u.id, u]));
             for (const u of incoming) {
                 const old = map.get(u.id);
-                map.set(u.id, old ? {...old, ...u} : u);
+                const merged = { ...(old ?? {}), ...u };
+                merged.is_me = isMe(merged);
+                map.set(u.id, merged);
             }
             return [...map.values()].sort((a, b) => a.nick.localeCompare(b.nick));
         });
@@ -130,9 +154,9 @@ export default function Prison() {
         const nick = normalizeNick(nickRaw);
         const id = String(idRaw);
 
-        if (clanRaw === "-") {
-            return;
-        }
+        // if (clanRaw === "-") {
+        //     return;
+        // }
 
         setUsers(prev => {
             const map = new Map(prev.map(u => [u.id, u]));
@@ -141,8 +165,9 @@ export default function Prison() {
                 ...(old ?? {}),
                 id,
                 nick: nick || old?.nick || "",
-                clan: clan, // ?? old?.clan ?? null
+                clan,
             };
+            merged.is_me = isMe(merged);
             map.set(id, merged);
             return [...map.values()].sort((a, b) => a.nick.localeCompare(b.nick));
         });
@@ -264,16 +289,26 @@ export default function Prison() {
           {users?.length > 0 && (
               <div className="mt-3">
                   <span>
-                      <b>Персонажи на платене (Ник | Клан):</b>
+                      <b>Персонажи на платене ({users?.length}):</b>
                   </span>
 
                   {users?.map((user) => (
                       <div className="mt-3 mb-2">
-                          <span>- {user?.nick} | {user?.clan}</span>
+                          <span>- {user?.nick}</span>
+
+                          {user?.clan && (
+                              <span> | {user?.clan}</span>
+                          )}
 
                           {user?.is_owner && (
                               <span>
                                   <b> (Владелец)</b>
+                              </span>
+                          )}
+
+                          {user?.is_me && (
+                              <span>
+                                  <b> (Я)</b>
                               </span>
                           )}
                       </div>
@@ -284,12 +319,16 @@ export default function Prison() {
           {canPrisonUsers?.length > 0 && (
               <div className="mt-4">
                   <span>
-                      <b>Персонажи которых можно посадить: (Ник | Клан):</b>
+                      <b>Персонажи которых можно посадить: ({canPrisonUsers?.length}):</b>
                   </span>
 
                   {canPrisonUsers?.map((user) => (
                       <div className="mt-3 mb-2">
-                          <span>- {user?.nick} | {user?.clan}</span>
+                          <span>- {user?.nick}</span>
+
+                          {user?.clan && (
+                              <span> | {user?.clan}</span>
+                          )}
                       </div>
                   ))}
               </div>

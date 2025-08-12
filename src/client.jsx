@@ -88,6 +88,9 @@ export default class Client {
             case "REGISTER": {
                 const [, id, pass, nick] = parts;
                 const hash = this.challenge ? calcHashFromHAAAPSI(this.challenge) : "";
+
+                this.emit("ACCOUNT", { id, nick, pass });
+
                 this.sendRaw(`USER ${id} ${pass} ${nick} ${hash}`);
                 break;
             }
