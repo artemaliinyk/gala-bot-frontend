@@ -13,10 +13,12 @@ export default function Prison() {
   const [authOk, setAuthOk] = useState(false);
   const [recoverCode, setRecoverCode] = useState("bfgbiy03rl");
   const [planet, setPlanet] = useState(null);
+
   const [whiteNickNames, setWhiteNickNames] = useState([
       "Shotty",
       "youdnok"
   ])
+
   const [whiteClans, setWhiteClans] = useState([
     "KO",
   ])
@@ -134,6 +136,18 @@ export default function Prison() {
         });
     }
 
+    // Check Owner this Planet
+    if (head === "FOUNDER") {
+        const id = String(lineSplit[1]);
+        if (!id) return;
+
+        setUsers(prev =>
+            prev.map(user =>
+                user.id === id ? { ...user, is_owner: true } : user
+            )
+        );
+    }
+
     // Users leave from Planer
     if (head === "PART") {
         const leaveUser = line.trim().split(/\s+/);
@@ -237,14 +251,28 @@ export default function Prison() {
               </div>
           </div>
 
+          {planet && (
+              <div className="mt-4">
+                  <b>Планета:</b> {planet}
+              </div>
+          )}
+
           {users?.length > 0 && (
-              <div className="mt-5">
+              <div className="mt-3">
                   <span>
                       <b>Персонажи на платене (Ник | Клан):</b>
                   </span>
 
                   {users?.map((user) => (
-                      <div className="mt-3 mb-2">- {user?.nick} | {user?.clan}</div>
+                      <div className="mt-3 mb-2">
+                          <span>- {user?.nick} | {user?.clan}</span>
+
+                          {user?.is_owner && (
+                              <span>
+                                  <b> (Владелец)</b>
+                              </span>
+                          )}
+                      </div>
                   ))}
               </div>
           )}
