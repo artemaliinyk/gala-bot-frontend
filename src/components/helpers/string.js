@@ -4,5 +4,12 @@ export const normalizeClan = (raw) => {
 }
 
 export const normalizeNick = (raw) => {
-    return String(raw || "").replace(/^[@+]+/, ""); // убираем @ и + в начале
+    return String(raw || "").replace(/^[@+]+/, "");
+}
+
+export const getListFromTextArea = (e) => {
+    return e.target.value
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
 }

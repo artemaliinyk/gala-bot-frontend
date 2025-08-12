@@ -1,6 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import Client from "/src/client.jsx";
-import {normalizeClan, normalizeNick} from "../../components/helpers/string.js";
+import {getListFromTextArea, normalizeClan, normalizeNick} from "../../components/helpers/string.js";
 import { Form, Button, Container, Row, Col } from 'react-bootstrap';
 
 export default function Prison() {
@@ -15,13 +15,15 @@ export default function Prison() {
   const [planet, setPlanet] = useState(null);
 
   const [whiteNickNames, setWhiteNickNames] = useState([
-      "Shotty",
-      "youdnok"
+      "youdnok",
   ])
 
   const [whiteClans, setWhiteClans] = useState([
     "KO",
+    "Shotty",
   ])
+
+  const [canPrisonUsers, setCanPrisonUsers] = useState(null)
 
   useEffect(() => {
         if (recoverCode.trim()) {
@@ -74,10 +76,20 @@ export default function Prison() {
   }, [client]);
 
   useEffect(() => {
-    if (users?.length > 0) {
-      console.log("Users Changed: ", users)
+    setCanPrisonUsers(
+        users.filter(user =>
+            !whiteNickNames.includes(user.nick) &&
+            !whiteClans.includes(user.clan) &&
+            !user?.is_owner
+        )
+    );
+  }, [users, whiteNickNames, whiteClans]);
+
+  useEffect(() => {
+    if (canPrisonUsers?.length > 0) {
+      console.log("canPrisonUsers: ", canPrisonUsers)
     }
-  }, [users]);
+  }, [canPrisonUsers]);
 
   const collectionUsers = (head, line, lineSplit) => {
     // Users already on Planet: 353
@@ -172,81 +184,73 @@ export default function Prison() {
   }
 
   const handleWhiteNickNames = (e) => {
-    const nickNames = e.target.value
-        .split("\n")
-        .map(line => line.trim())
-        .filter(Boolean);
-
-      setWhiteNickNames(nickNames)
+      setWhiteNickNames(getListFromTextArea(e))
   }
 
   const handleWhiteClans = (e) => {
-    const clans = e.target.value
-        .split("\n")
-        .map(line => line.trim())
-        .filter(Boolean);
-
-    setWhiteClans(clans)
+    setWhiteClans(getListFromTextArea(e))
   }
 
   return (
       <Container fluid className="p-4">
-          <Form>
-              <Form.Group controlId="formName" className="mb-3">
-                  <Form.Label>Recovery Code:</Form.Label>
+          <div className="d-flex gap-5 mb-5">
+              <Form>
+                  <Form.Group controlId="formName" className="mb-3">
+                      <Form.Label>Recovery Code:</Form.Label>
 
-                  <Form.Control
-                      type="text"
-                      placeholder="Recovery Code"
-                      style={{width: "150px"}}
-                      value={recoverCode}
-                      onChange={(e) => setRecoverCode(e.target.value)}
-                  />
-              </Form.Group>
-
-              <div className="d-flex gap-2">
-                  <Button
-                      variant="primary"
-                      type="submit"
-                      onClick={handleLogin}
-                  >
-                      Вход
-                  </Button>
-
-                  <Button
-                      variant="primary"
-                      type="submit"
-                      onClick={handleQuit}
-                  >
-                      Выход
-                  </Button>
-              </div>
-
-          </Form>
-
-          <div className="mt-5">
-              <span>
-                  <b>Белый Список (Ники, Кланы):</b>
-              </span>
-              <div className="d-flex gap-2">
-                  <div className={"mt-3"}>
                       <Form.Control
-                          as="textarea"
-                          rows={3}
-                          style={{ width: "150px" }}
-                          onChange={handleWhiteNickNames}
-                          value={whiteNickNames.join("\n")}
+                          type="text"
+                          placeholder="Recovery Code"
+                          style={{width: "150px"}}
+                          value={recoverCode}
+                          onChange={(e) => setRecoverCode(e.target.value)}
                       />
+                  </Form.Group>
+
+                  <div className="d-flex gap-2">
+                      <Button
+                          variant="primary"
+                          type="submit"
+                          onClick={handleLogin}
+                      >
+                          Вход
+                      </Button>
+
+                      <Button
+                          variant="primary"
+                          type="submit"
+                          onClick={handleQuit}
+                      >
+                          Выход
+                      </Button>
                   </div>
 
-                  <div className={"mt-3"}>
-                      <Form.Control
-                          as="textarea"
-                          rows={3}
-                          style={{ width: "150px" }}
-                          onChange={handleWhiteClans}
-                          value={whiteClans.join("\n")}
-                      />
+              </Form>
+
+              <div className="ml-5">
+                  <span>
+                      <b>Белый Список (Ники, Кланы):</b>
+                  </span>
+                  <div className="d-flex gap-2">
+                      <div className={"mt-3"}>
+                          <Form.Control
+                              as="textarea"
+                              rows={3}
+                              style={{width: "150px"}}
+                              onChange={handleWhiteNickNames}
+                              value={whiteNickNames.join("\n")}
+                          />
+                      </div>
+
+                      <div className={"mt-3"}>
+                          <Form.Control
+                              as="textarea"
+                              rows={3}
+                              style={{width: "150px"}}
+                              onChange={handleWhiteClans}
+                              value={whiteClans.join("\n")}
+                          />
+                      </div>
                   </div>
               </div>
           </div>
@@ -272,6 +276,20 @@ export default function Prison() {
                                   <b> (Владелец)</b>
                               </span>
                           )}
+                      </div>
+                  ))}
+              </div>
+          )}
+
+          {canPrisonUsers?.length > 0 && (
+              <div className="mt-4">
+                  <span>
+                      <b>Персонажи которых можно посадить: (Ник | Клан):</b>
+                  </span>
+
+                  {canPrisonUsers?.map((user) => (
+                      <div className="mt-3 mb-2">
+                          <span>- {user?.nick} | {user?.clan}</span>
                       </div>
                   ))}
               </div>
