@@ -8,9 +8,9 @@ function calcHashFromHAAAPSI(challenge) {
 }
 
 export default class Client {
-    constructor({ url, ident }) {
-        this.url = url;
-        this.ident = ident;
+    constructor() {
+        this.url = "wss://cs.mobstudio.ru:6672";
+        this.ident = ":ru IDENT 352 -2 4030 1 2 :GALA";
 
         this.ws = null;
         this.challenge = null;
