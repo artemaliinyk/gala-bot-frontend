@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import Client from "/src/client.jsx";
 import {normalizeClan, normalizeNick} from "../../components/helpers/string.js";
+import { Form, Button, Container, Row, Col } from 'react-bootstrap';
 
 export default function Prison() {
   const client = useMemo(() => new Client(), []);
@@ -11,6 +12,7 @@ export default function Prison() {
   const [connected, setConnected] = useState(false);
   const [authOk, setAuthOk] = useState(false);
   const [recoverCode, setRecoverCode] = useState("bfgbiy03rl");
+  const [planet, setPlanet] = useState(null);
 
   useEffect(() => {
         if (recoverCode.trim()) {
@@ -41,9 +43,14 @@ export default function Prison() {
 
     const offMsg = client.on("message", (line) => {
         const head = line.split(" ")[0];
+        const lineSplit = line.trim().split(/\s+/);
+
+        if (head === "900") {
+            setPlanet(lineSplit[1])
+        }
 
         // Collection of Users Data
-        collectionUsers(head, line)
+        collectionUsers(head, line, lineSplit)
     });
 
     return () => {
@@ -63,7 +70,7 @@ export default function Prison() {
     }
   }, [users]);
 
-  const collectionUsers = (head, line) => {
+  const collectionUsers = (head, line, lineSplit) => {
     // Users already on Planet: 353
     if (head === "353") {
         const regex = /([:@\w]+)\s+([^\s]+)\s+(\d{5,})/g;
@@ -144,36 +151,51 @@ export default function Prison() {
   };
 
   return (
-    <div style={{fontFamily: "monospace"}}>
-        <form onSubmit={handleLogin} style={{display: "flex", gap: 8, marginBottom: 8}}>
-            <input
-                placeholder="RECOVER_CODE"
-                value={recoverCode}
-                onChange={(e) => setRecoverCode(e.target.value)}
-            />
-            <button type="submit">
-                Войти
-            </button>
-        </form>
+      <Container fluid className="p-4">
+          <Form>
+              <Form.Group controlId="formName" className="mb-3">
+                  <Form.Label>Recovery Code:</Form.Label>
 
-        <div style={{marginBottom: 8, display: "flex", gap: 12}}>
-            <button onClick={handleQuit}>Выход</button>
-        </div>
+                  <Form.Control
+                      type="text"
+                      placeholder="Recovery Code"
+                      style={{width: "150px"}}
+                      value={recoverCode}
+                      onChange={(e) => setRecoverCode(e.target.value)}
+                  />
+              </Form.Group>
 
-        <div style={{marginBottom: 8}}>
-            <strong>Users:</strong>
-            <ul>
-                {users.map((u) => (
-                    <li key={`${u.id}-${u.nick}`}>
-                        {u.nick} ({u.id}){u.clan ? ` [${u.clan}]` : ""}
-                    </li>
-                ))}
-            </ul>
-        </div>
+              <div className="d-flex gap-2">
+                  <Button
+                      variant="primary"
+                      type="submit"
+                      onClick={handleLogin}
+                  >
+                      Вход
+                  </Button>
 
-        <pre style={{maxHeight: 420, overflow: "auto", background: "#111", color: "#0f0", padding: 8}}>
-            {log.join("\n")}
-        </pre>
-    </div>
+                  <Button
+                      variant="primary"
+                      type="submit"
+                      onClick={handleQuit}
+                  >
+                      Выход
+                  </Button>
+              </div>
+
+          </Form>
+
+          {users?.length > 0 && (
+              <>
+                  <div className="mt-5">
+                      <b>Персонажи на платене (Ник | Клан):</b>
+                  </div>
+
+                  {users?.map((user) => (
+                      <div className="mb-2">- {user?.nick} | {user?.clan}</div>
+                  ))}
+              </>
+          )}
+      </Container>
   );
 }
