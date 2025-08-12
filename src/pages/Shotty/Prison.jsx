@@ -59,7 +59,7 @@ export default function Prison() {
 
   useEffect(() => {
     if (users?.length > 0) {
-      console.log("Users Changed:", users)
+      console.log("Users Changed: ", users)
     }
   }, [users]);
 
