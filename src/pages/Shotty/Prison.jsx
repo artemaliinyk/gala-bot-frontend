@@ -13,6 +13,13 @@ export default function Prison() {
   const [authOk, setAuthOk] = useState(false);
   const [recoverCode, setRecoverCode] = useState("bfgbiy03rl");
   const [planet, setPlanet] = useState(null);
+  const [whiteNickNames, setWhiteNickNames] = useState([
+      "Shotty",
+      "youdnok"
+  ])
+  const [whiteClans, setWhiteClans] = useState([
+    "KO",
+  ])
 
   useEffect(() => {
         if (recoverCode.trim()) {
@@ -143,12 +150,30 @@ export default function Prison() {
     setUsers([]);
     client.reset();
     client.startLogin(recoverCode.trim());
-  };
+  }
 
   const handleQuit = () => {
     clientRef.current.send("QUIT :ds");
     clientRef.current.close();
-  };
+  }
+
+  const handleWhiteNickNames = (e) => {
+    const nickNames = e.target.value
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean);
+
+      setWhiteNickNames(nickNames)
+  }
+
+  const handleWhiteClans = (e) => {
+    const clans = e.target.value
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    setWhiteClans(clans)
+  }
 
   return (
       <Container fluid className="p-4">
@@ -185,16 +210,43 @@ export default function Prison() {
 
           </Form>
 
-          {users?.length > 0 && (
-              <>
-                  <div className="mt-5">
-                      <b>Персонажи на платене (Ник | Клан):</b>
+          <div className="mt-5">
+              <span>
+                  <b>Белый Список (Ники, Кланы):</b>
+              </span>
+              <div className="d-flex gap-2">
+                  <div className={"mt-3"}>
+                      <Form.Control
+                          as="textarea"
+                          rows={3}
+                          style={{ width: "150px" }}
+                          onChange={handleWhiteNickNames}
+                          value={whiteNickNames.join("\n")}
+                      />
                   </div>
 
+                  <div className={"mt-3"}>
+                      <Form.Control
+                          as="textarea"
+                          rows={3}
+                          style={{ width: "150px" }}
+                          onChange={handleWhiteClans}
+                          value={whiteClans.join("\n")}
+                      />
+                  </div>
+              </div>
+          </div>
+
+          {users?.length > 0 && (
+              <div className="mt-5">
+                  <span>
+                      <b>Персонажи на платене (Ник | Клан):</b>
+                  </span>
+
                   {users?.map((user) => (
-                      <div className="mb-2">- {user?.nick} | {user?.clan}</div>
+                      <div className="mt-3 mb-2">- {user?.nick} | {user?.clan}</div>
                   ))}
-              </>
+              </div>
           )}
       </Container>
   );
