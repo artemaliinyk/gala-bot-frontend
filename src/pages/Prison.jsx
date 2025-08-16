@@ -54,7 +54,10 @@ function Bot({ label: caption }) {
   const recoverRef = useRef("");
 
   const [autoRun, setAutoRun] = useState(true);
-  const [delayMs, setDelayMs] = useState(2050);
+
+ 
+  const [delayEngageMs, setDelayEngageMs] = useState(2000); 
+  const [delayGuardMs, setDelayGuardMs] = useState(1850);   
 
   const [founderId, setFounderId] = useState(null);
   const [myId, setMyId] = useState(null);
@@ -62,7 +65,7 @@ function Bot({ label: caption }) {
   const [uiPlayers, setUiPlayers] = useState([]);
   const [lastShot, setLastShot] = useState(null);
 
-  /** --- Фильтр по кланам (whitelist) --- */
+ 
   const [allowedClansInput, setAllowedClansInput] = useState("");
   const allowedClansRef = useRef(new Set());
   useEffect(() => {
@@ -76,11 +79,14 @@ function Bot({ label: caption }) {
     allowedClansRef.current = set;
   }, [allowedClansInput]);
 
-  const settingsRef = useRef({ autoRun: true, delayMs: 2050 });
+  /** Настройки в рефах */
+  const settingsRef = useRef({ autoRun: true, delayEngageMs: 2000, delayGuardMs: 1850 });
   const founderIdRef = useRef(null);
   const myIdRef = useRef(null);
+
   useEffect(() => { settingsRef.current.autoRun = autoRun; }, [autoRun]);
-  useEffect(() => { settingsRef.current.delayMs = delayMs; }, [delayMs]);
+  useEffect(() => { settingsRef.current.delayEngageMs = delayEngageMs; }, [delayEngageMs]);
+  useEffect(() => { settingsRef.current.delayGuardMs = delayGuardMs; }, [delayGuardMs]);
   useEffect(() => { founderIdRef.current = founderId; }, [founderId]);
   useEffect(() => { myIdRef.current = myId; }, [myId]);
 
@@ -164,15 +170,15 @@ function Bot({ label: caption }) {
     if (!targets.length) {
       const whitelist = allowedClansRef.current;
       if (whitelist && whitelist.size > 0 && hasUnknownClanPresent()) {
-        const extra = 300;
+        const extra = 32;
         appLog(`Есть присутствующие без клана/ника → подождём ещё ${extra} мс (${why}).`);
         clearTimeout(sm.current.timers.waitResume);
         sm.current.timers.waitResume = setTimeout(() => performActionsOrWait("grace"), extra);
         sm.current.waitingForTarget = true;
         return;
       }
+      appLog(`Целей нет → продолжаем дежурить (${why}).`);
       sm.current.waitingForTarget = true;
-      appLog(`No targets → stay & wait (${why}).`);
       return;
     }
 
@@ -181,9 +187,8 @@ function Bot({ label: caption }) {
     quitSoon();
   };
 
-  /** Cycle */
   const startCycle = () => {
-    const delay = Math.max(0, Number(settingsRef.current.delayMs) || 0);
+    const delay = Math.max(0, Number(settingsRef.current.delayEngageMs) || 0);
     const s = sm.current;
     s.onPlanet = true;
     s.joinAt = Date.now();
@@ -195,7 +200,7 @@ function Bot({ label: caption }) {
     setLastShot(null);
     refreshUi();
 
-    appLog(`Старт цикла. Интервал = ${delay} мс. Ждём...`);
+    appLog(`Старт цикла (Engage). Интервал = ${delay} мс. Ждём...`);
     clearTimeout(s.timers.deadline);
     s.timers.deadline = setTimeout(() => performActionsOrWait("deadline"), Math.max(0, s.deadlineTs - Date.now()));
   };
@@ -288,6 +293,18 @@ function Bot({ label: caption }) {
 
       upsert(playersRef.current, id, patch);
       appLog(`JOIN parsed: id=${id} nick=${nick} clan=${clanRaw !== "-" ? clan : "-"}`);
+      const isEnemy = !patch.isMe && !patch.isKing;
+      if (isEnemy && sm.current.onPlanet) {
+        clearTimeout(sm.current.timers.deadline);
+        const guardDelay = Math.max(0, Number(settingsRef.current.delayGuardMs) || 0);
+        sm.current.deadlineTs = Date.now() + guardDelay;
+        sm.current.waitingForTarget = true;
+        appLog(`Враг обнаружен → ждём ${guardDelay} мс (Guard) и атакуем`);
+        sm.current.timers.deadline = setTimeout(
+          () => performActionsOrWait("enemy-join"),
+          guardDelay
+        );
+      }
 
       tryResumeWaitingAtDeadline();
       refreshUi();
@@ -411,10 +428,28 @@ function Bot({ label: caption }) {
 
       <div style={{ marginBottom: 8, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={handleQuit}>Выход</button>
+
+        {/*таймеры */}
         <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          Интервал (мс):
-          <input type="number" step="1" min="0" value={delayMs} onChange={(e) => setDelayMs(Number(e.target.value) || 0)} style={{ width: 90 }} />
+          Engage (мс):
+          <input
+            type="number" step="1" min="0"
+            value={delayEngageMs}
+            onChange={(e) => setDelayEngageMs(Number(e.target.value) || 0)}
+            style={{ width: 90 }}
+          />
         </label>
+
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          Guard (мс):
+          <input
+            type="number" step="1" min="0"
+            value={delayGuardMs}
+            onChange={(e) => setDelayGuardMs(Number(e.target.value) || 0)}
+            style={{ width: 90 }}
+          />
+        </label>
+
         <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
           <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
           Авто-повтор заходов
