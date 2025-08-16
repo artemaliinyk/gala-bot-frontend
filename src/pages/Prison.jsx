@@ -20,6 +20,16 @@ const mkLogger = (set) => (p, m) =>
     return next;
   });
 
+/** Нормализация */
+const normalizeClan = (s) =>
+  String(s || "")
+    .trim()
+    .replace(/^[\[@]+/, "")
+    .replace(/[\]]+$/, "")
+    .toLowerCase();
+
+const normalizeNick = (s) => String(s || "").trim();
+
 /** Player model */
 function upsert(map, id, patch = {}) {
   if (!id) return;
@@ -52,21 +62,27 @@ function Bot({ label: caption }) {
   const [uiPlayers, setUiPlayers] = useState([]);
   const [lastShot, setLastShot] = useState(null);
 
+  /** --- Фильтр по кланам (whitelist) --- */
+  const [allowedClansInput, setAllowedClansInput] = useState("");
+  const allowedClansRef = useRef(new Set());
+  useEffect(() => {
+    const set = new Set(
+      allowedClansInput
+        .split(/[,\s]+/u)
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .map((x) => normalizeClan(x))
+    );
+    allowedClansRef.current = set;
+  }, [allowedClansInput]);
+
   const settingsRef = useRef({ autoRun: true, delayMs: 2050 });
   const founderIdRef = useRef(null);
   const myIdRef = useRef(null);
-  useEffect(() => {
-    settingsRef.current.autoRun = autoRun;
-  }, [autoRun]);
-  useEffect(() => {
-    settingsRef.current.delayMs = delayMs;
-  }, [delayMs]);
-  useEffect(() => {
-    founderIdRef.current = founderId;
-  }, [founderId]);
-  useEffect(() => {
-    myIdRef.current = myId;
-  }, [myId]);
+  useEffect(() => { settingsRef.current.autoRun = autoRun; }, [autoRun]);
+  useEffect(() => { settingsRef.current.delayMs = delayMs; }, [delayMs]);
+  useEffect(() => { founderIdRef.current = founderId; }, [founderId]);
+  useEffect(() => { myIdRef.current = myId; }, [myId]);
 
   // players
   const playersRef = useRef(new Map()); // Map<id, {id,nick,clan,present,isKing,isMe}>
@@ -78,7 +94,7 @@ function Bot({ label: caption }) {
     deadlineTs: 0,
     timers: { deadline: null, quit: null, relogin: null, waitResume: null },
     waitingForTarget: false,
-    selfJoinPending: false, 
+    selfJoinPending: false,
   });
 
   /** Roster/UI */
@@ -97,13 +113,23 @@ function Bot({ label: caption }) {
     setUiPlayers(arr);
   };
 
+  const hasUnknownClanPresent = () =>
+    Array.from(playersRef.current.values()).some((p) => p.present && (!p.clan || !p.nick));
+
   const getTargets = () => {
     const king = String(founderIdRef.current ?? "");
     const me = String(myIdRef.current ?? "");
+    const whitelist = allowedClansRef.current;
+
     return Array.from(playersRef.current.values())
-      .filter((p) => p.present)
-      .filter((p) => String(p.id) !== king)
-      .filter((p) => String(p.id) !== me);
+      .filter((p) => p.present && String(p.id) !== king && String(p.id) !== me)
+      .filter((p) => {
+        if (!whitelist || whitelist.size === 0) return true;
+        const clan = normalizeClan(p.clan);
+        const ok = clan && whitelist.has(clan);
+        if (!ok) appLog(`Игрок id=${p.id} nick=${p.nick ?? "—"} clan=${p.clan ?? "—"} проигнорирован — нет в списке`);
+        return ok;
+      });
   };
 
   /** Action & Quit */
@@ -111,11 +137,7 @@ function Bot({ label: caption }) {
     const elapsedMs = Date.now() - sm.current.joinAt;
     const caught3s = elapsedMs >= 3000;
     setLastShot({ elapsedMs, caught3s, targets: count });
-    appLog(
-      caught3s
-        ? `3s caught: ACTION at ${elapsedMs} ms, targets: ${count}`
-        : `<3s: ACTION at ${elapsedMs} ms, targets: ${count}`
-    );
+    appLog(caught3s ? `3s caught: ACTION at ${elapsedMs} ms, targets: ${count}` : `<3s: ACTION at ${elapsedMs} ms, targets: ${count}`);
   };
 
   const quitSoon = () => {
@@ -138,11 +160,22 @@ function Bot({ label: caption }) {
 
   const performActionsOrWait = (why = "deadline") => {
     const targets = getTargets();
+
     if (!targets.length) {
+      const whitelist = allowedClansRef.current;
+      if (whitelist && whitelist.size > 0 && hasUnknownClanPresent()) {
+        const extra = 300;
+        appLog(`Есть присутствующие без клана/ника → подождём ещё ${extra} мс (${why}).`);
+        clearTimeout(sm.current.timers.waitResume);
+        sm.current.timers.waitResume = setTimeout(() => performActionsOrWait("grace"), extra);
+        sm.current.waitingForTarget = true;
+        return;
+      }
       sm.current.waitingForTarget = true;
       appLog(`No targets → stay & wait (${why}).`);
       return;
     }
+
     sm.current.waitingForTarget = false;
     sendActions(targets);
     quitSoon();
@@ -158,9 +191,7 @@ function Bot({ label: caption }) {
     s.waitingForTarget = false;
     clearTimeout(s.timers.waitResume);
 
-    playersRef.current.forEach((p) => {
-      p.present = false;
-    });
+    playersRef.current.forEach((p) => { p.present = false; });
     setLastShot(null);
     refreshUi();
 
@@ -180,7 +211,6 @@ function Bot({ label: caption }) {
     startCycle();
   };
 
-  /** Inbound parsing */
   const tryResumeWaitingAtDeadline = () => {
     if (!sm.current.waitingForTarget) return;
     const s = sm.current;
@@ -198,84 +228,90 @@ function Bot({ label: caption }) {
 
   const handleInbound = (line) => {
     addLog("<=", line);
+    const head = line.split(" ")[0];
+    const parts = line.trim().split(/\s+/);
 
-    // FOUNDER / FO <id>
+    // founder / self
     const mFounder = line.match(/\bFO(?:UNDER)?\s+(\d{6,})\b/i);
     if (mFounder && mFounder[1] !== "0") {
       const id = mFounder[1];
-      setFounderId(id);
-      founderIdRef.current = id;
+      setFounderId(id); founderIdRef.current = id;
       upsert(playersRef.current, id, { isKing: true, present: true });
     }
-
     const mSelf = line.match(/^(?:YOU|ME|MYID|SELF|USER)\s+(\d{6,})\b/i);
     if (mSelf) {
       const id = mSelf[1];
-      setMyId(id);
-      myIdRef.current = id;
+      setMyId(id); myIdRef.current = id;
       upsert(playersRef.current, id, { isMe: true, present: true });
     }
 
-    // JOIN <nick> <clan> <id> ...
-    const mJoin = line.match(/^JOIN\s+([^\s]+)\s+([^\s]+)\s+(\d{6,})\b/u);
-    if (mJoin) {
-      const nick = mJoin[1];
-      const clan = mJoin[2];
-      const id = mJoin[3];
-
-      if (sm.current.selfJoinPending && !myIdRef.current) {
-        setMyId(id);
-        myIdRef.current = id;
-        sm.current.selfJoinPending = false;
-      }
-
-      upsert(playersRef.current, id, {
-        nick,
-        clan,
-        present: true,
-        isKing: String(id) === String(founderIdRef.current || ""),
-        isMe: String(id) === String(myIdRef.current || ""),
-      });
-
-      tryResumeWaitingAtDeadline();
-    }
-    let m353 = line.match(/^353\b.*?:([^\s]+)\s+@([^\s]+)\s+(\d{6,})\b/u);
-    if (m353) {
-      const nick = m353[1],
-        clan = m353[2],
-        id = m353[3];
-      upsert(playersRef.current, id, {
-        nick,
-        clan,
-        present: true,
-        isKing: String(id) === String(founderIdRef.current || ""),
-        isMe: String(id) === String(myIdRef.current || ""),
-      });
-      tryResumeWaitingAtDeadline();
-    } else {
-      m353 = line.match(/^353\b.*?@([^\s]+)\s+:([^\s]+)\s+(\d{6,})\b/u);
-      if (m353) {
-        const clan = m353[1],
-          nick = m353[2],
-          id = m353[3];
+    if (head === "353") {
+      const regex = /([:@\w]+)\s+([^\s]+)\s+(\d{5,})/g;
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        const clan = normalizeClan(match[1]);
+        const nick = normalizeNick(match[2]);
+        const id = String(match[3]);
         upsert(playersRef.current, id, {
-          nick,
-          clan,
-          present: true,
+          clan, nick, present: true,
           isKing: String(id) === String(founderIdRef.current || ""),
           isMe: String(id) === String(myIdRef.current || ""),
         });
-        tryResumeWaitingAtDeadline();
       }
+      tryResumeWaitingAtDeadline();
+      refreshUi();
+      return;
     }
 
-    if (line.startsWith("860 ")) {
+    if (head === "JOIN") {
+      const clanRaw = parts[1];
+      const nickRaw = parts[2];
+      const idRaw   = parts[3];
+      if (!nickRaw || !idRaw) return;
+
+      const clan = normalizeClan(clanRaw);
+      const nick = normalizeNick(nickRaw);
+      const id   = String(idRaw);
+
+      if (sm.current.selfJoinPending && !myIdRef.current) {
+        setMyId(id); myIdRef.current = id;
+        sm.current.selfJoinPending = false;
+      }
+
+      const patch = {
+        nick,
+        present: true,
+        isKing: String(id) === String(founderIdRef.current || ""),
+        isMe: String(id) === String(myIdRef.current || ""),
+      };
+      if (clanRaw !== "-") patch.clan = clan;
+
+      upsert(playersRef.current, id, patch);
+      appLog(`JOIN parsed: id=${id} nick=${nick} clan=${clanRaw !== "-" ? clan : "-"}`);
+
+      tryResumeWaitingAtDeadline();
+      refreshUi();
+      return;
+    }
+
+    // === PART:===
+    if (head === "PART") {
+      const id = String(parts[1] || "");
+      if (id) upsert(playersRef.current, id, { present: false });
+      refreshUi();
+      return;
+    }
+
+    // === 860: presence
+    if (head === "860") {
       const idOnly = line.match(/^860\s+(\d{6,})\b/);
       if (idOnly) upsert(playersRef.current, idOnly[1], { present: true });
       let m;
       const re = /\b(\d{6,})\b/g;
       while ((m = re.exec(line)) !== null) upsert(playersRef.current, m[1], { present: true });
       tryResumeWaitingAtDeadline();
+      refreshUi();
+      return;
     }
 
     refreshUi();
@@ -296,21 +332,13 @@ function Bot({ label: caption }) {
         }, RELOGIN_DELAY + RELOGIN_COOLDOWN_MS);
       }
     });
-    const offAuth = client.on("auth_ok", () => {
-      setAuthOk(true);
-      doJoin();
-    });
+    const offAuth = client.on("auth_ok", () => { setAuthOk(true); doJoin(); });
     const offTx = client.on("tx", (m) => addLog("=>", m));
     const offLine = client.on("line", handleInbound);
     const offMsg = client.on("message", handleInbound);
 
     return () => {
-      offOpen();
-      offClose();
-      offAuth();
-      offTx();
-      offLine();
-      offMsg();
+      offOpen(); offClose(); offAuth(); offTx(); offLine(); offMsg();
       clearTimeout(sm.current.timers.deadline);
       clearTimeout(sm.current.timers.quit);
       clearTimeout(sm.current.timers.relogin);
@@ -325,20 +353,15 @@ function Bot({ label: caption }) {
     if (!recoverCode.trim()) return;
 
     setLog([]);
-    setFounderId(null);
-    founderIdRef.current = null;
-    setMyId(null);
-    myIdRef.current = null;
+    setFounderId(null); founderIdRef.current = null;
+    setMyId(null); myIdRef.current = null;
     setLastShot(null);
     setUiPlayers([]);
     playersRef.current.clear();
     sm.current = {
-      onPlanet: false,
-      joinAt: 0,
-      deadlineTs: 0,
+      onPlanet: false, joinAt: 0, deadlineTs: 0,
       timers: { deadline: null, quit: null, relogin: null, waitResume: null },
-      waitingForTarget: false,
-      selfJoinPending: false,
+      waitingForTarget: false, selfJoinPending: false,
     };
 
     recoverRef.current = recoverCode.trim();
@@ -355,12 +378,11 @@ function Bot({ label: caption }) {
 
   /** UI bits */
   const ShotBadge = () => {
-    if (!lastShot)
-      return (
-        <span style={{ padding: "2px 8px", borderRadius: 12, background: "#333", color: "#fff" }}>
-          3s: — (ждём)
-        </span>
-      );
+    if (!lastShot) return (
+      <span style={{ padding: "2px 8px", borderRadius: 12, background: "#333", color: "#fff" }}>
+        3s: — (ждём)
+      </span>
+    );
     const ok = lastShot.caught3s;
     return (
       <span
@@ -374,8 +396,7 @@ function Bot({ label: caption }) {
 
   const RosterItem = ({ p }) => (
     <li key={p.id} style={{ margin: "2px 0" }}>
-      {show(p)} {p.isKing ? "King" : ""}
-      {p.isMe ? " (я)" : ""}
+      {show(p)} {p.isKing ? "King" : ""}{p.isMe ? " (я)" : ""}
     </li>
   );
 
@@ -385,9 +406,7 @@ function Bot({ label: caption }) {
 
       <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <input placeholder="RECOVER_CODE" value={recoverCode} onChange={(e) => setRecoverCode(e.target.value)} disabled={authOk} />
-        <button type="submit" disabled={authOk || !recoverCode.trim()}>
-          Войти
-        </button>
+        <button type="submit" disabled={authOk || !recoverCode.trim()}>Войти</button>
       </form>
 
       <div style={{ marginBottom: 8, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -400,23 +419,32 @@ function Bot({ label: caption }) {
           <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
           Авто-повтор заходов
         </label>
+
+        {/* --- Clans --- */}
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          Кланы (через запятую):
+          <input
+            type="text"
+            placeholder="US, GALA, TAURA"
+            value={allowedClansInput}
+            onChange={(e) => setAllowedClansInput(e.target.value)}
+            style={{ width: 220 }}
+          />
+        </label>
+
         <ShotBadge />
-        <span>
-          WS: {connected ? "connected" : "disconnected"} | AUTH: {authOk ? "OK" : "—"}
-        </span>
+        <span>WS: {connected ? "connected" : "disconnected"} | AUTH: {authOk ? "OK" : "—"}</span>
       </div>
 
       <div style={{ marginBottom: 8 }}>
         <strong>Игроки (клан + ник):</strong>
         <ul style={{ paddingLeft: 16 }}>
-          {uiPlayers.map((p) => (
-            <RosterItem key={p.id} p={p} />
-          ))}
+          {uiPlayers.map((p) => (<RosterItem key={p.id} p={p} />))}
         </ul>
       </div>
 
       <pre style={{ maxHeight: 300, overflow: "auto", background: "#111", color: "#0f0", padding: 8 }}>
-        {log.join("\n")} 
+        {log.join("\n")}
       </pre>
     </div>
   );
