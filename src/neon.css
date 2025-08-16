@@ -1,0 +1,195 @@
+:root{
+  --neon: #00e7ff; 
+  --neon-soft: rgba(0,231,255,.28); /
+}
+
+.neon-card{
+  position: relative;
+                border-radius: 12px;
+  padding: 12px;
+      background: #0e0f14;         
+  border: 1px solid var(--neon);
+         box-shadow:
+        0 0 8px   var(--neon),
+    0 0 22px  var(--neon),
+            inset 0 0 10px var(--neon-soft);
+}
+
+@keyframes neonPulse {
+  0%,100% {
+    box-shadow:
+      0 0 6px  var(--neon), 0 0 18px var(--neon),inset 0 0 6px var(--neon-soft);
+  }
+            50% {
+            box-shadow:
+         0 0 12px var(--neon),
+      0 0 30px var(--neon),
+            inset 0 0 12px var(--neon-soft);
+  }
+}
+.neon-pulse { animation: neonPulse 2.8s ease-in-out infinite; }
+
+.neon-btn{
+  background: transparent; border: 1px solid var(--neon);
+  color: var(--neon);
+  font-weight: 600; padding: .5rem .9rem;
+  line-height: 1;
+  border-radius: 10px; box-shadow: 0 0 8px var(--neon); transition: transform .1s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+}
+.neon-btn:hover{
+  background: var(--neon);
+  color: #0b0d11;
+  box-shadow: 0 0 14px var(--neon), 0 0 28px var(--neon);
+}
+.neon-btn:active{ transform: translateY(1px) }
+.neon-hr{
+  
+    border: none;
+  
+    height: 1px;
+  background: var(--neon);
+            box-shadow: 0 0 8px var(--neon), 0 0 16px var(--neon);
+  opacity: .7;
+  margin: 8px 0 12px;
+}
+
+.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.neon-card > header{
+  margin: 4px 6px 8px;  
+  padding: 0;           
+  background: transparent;
+  border: 0;
+}
+.neon-tag{
+  display: inline-block;
+     padding: 4px 10px;         
+            font-size: 0.9rem;       
+    font-weight: 700;
+  border-radius: 10px;      
+        color: var(--neon);
+  border: 1px solid var(--neon);
+        background: rgba(0,0,0,.35);
+  box-shadow:
+          0 0 6px var(--neon),
+                  0 0 14px var(--neon),
+    inset 0 0 6px var(--neon-soft);
+}
+
+
+.neon-tag.sm { padding: 3px 8px; font-size: .85rem; border-radius: 8px; }
+.neon-tag.lg { padding: 6px 14px; font-size: 1rem;  border-radius: 12px; }
+
+
+
+
+
+
+
+
+
+.full-center{
+  min-height: 100vh;
+  display: flex;
+        align-items: center;  
+    justify-content: center;
+  padding: 0 16px; 
+}
+
+
+.neon-title{
+  font-size: clamp(28px, 6vw, 72px);
+  letter-spacing: .06em;
+  color: var(--neon);
+  padding: .5em .9em;
+  border: 2px solid var(--neon);
+  border-radius: 16px;
+  background: rgba(0,0,0,.25);
+  text-shadow:
+    0 0 6px  var(--neon),
+    0 0 12px var(--neon),
+    0 0 24px var(--neon),
+    0 0 48px var(--neon);
+  box-shadow:
+    0 0 12px var(--neon),
+    0 0 32px var(--neon),
+    inset 0 0 10px var(--neon-soft);
+}
+
+
+@keyframes neonTitlePulse{
+  0%,100%{ text-shadow: 0 0 6px var(--neon), 0 0 12px var(--neon), 0 0 24px var(--neon), 0 0 48px var(--neon); }
+  50%    { text-shadow: 0 0 10px var(--neon), 0 0 22px var(--neon), 0 0 36px var(--neon), 0 0 64px var(--neon); }
+}
+.neon-title.pulse{ animation: neonTitlePulse 2.8s ease-in-out infinite; }
+
+
+.neon-rainbow{
+  position: relative;
+  margin: 0;
+  font-weight: 900;
+  font-size: clamp(44px, 10vw, 140px);
+  letter-spacing: .04em;
+
+
+  background: linear-gradient(90deg,
+    #ff6bd6, #7f5af0, #00e7ff, #00ffa3, #ffd166, #ff6bd6);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+
+  animation: rainbowShift 8s linear infinite;
+}
+
+
+.neon-rainbow::before{
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  background-size: inherit;
+  -webkit-background-clip: text;
+  color: transparent;
+  filter: blur(16px);
+  opacity: .55;         
+  z-index: -1;
+  animation: inherit;   
+}
+
+
+.neon-rainbow.soft::before{ filter: blur(12px); opacity: .35; }
+
+
+.neon-rainbow.static{ animation: none; } .neon-rainbow.static::before{ animation: none; }
+
+
+@keyframes rainbowShift{
+  0%   { background-position:   0% 0; }
+  100% { background-position: 100% 0; }
+}
+
+.neon-rainbow {
+  -webkit-text-stroke: 0.6px rgba(255,255,255,.35); 
+}
+
+
+@keyframes neonRainbowPulseStrong{
+  0%,100%{
+    filter: blur(14px) brightness(1.0);
+        opacity: .50;
+        transform: scale(1);
+  }
+  50%{
+        filter: blur(28px) brightness(1.45); 
+        opacity: .95;                        
+        transform: scale(1.04);              
+  }
+}
+
+.neon-rainbow.pulse-strong::before{
+  animation:
+                 rainbowShift 8s linear infinite,
+              neonRainbowPulseStrong 2.2s ease-in-out infinite;will-change: filter, opacity, transform;
+  pointer-events: none;
+}

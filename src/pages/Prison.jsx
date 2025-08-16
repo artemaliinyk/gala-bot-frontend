@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Client from "/src/client.jsx";
 import '@picocss/pico/css/pico.min.css';
+import "../neon.css";
 
 /** Connection + ident */
 const WS_URL = "wss://cs.mobstudio.ru:6672";
@@ -419,32 +420,35 @@ function Bot({ label: caption }) {
   );
 
 return (
-  <article style={{ marginBottom: 16 }}>
-    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-      <strong>{caption}</strong>
-    </header>
+  <article className="neon-card neon-pulse" style={{ marginBottom: 16 }}>
+<header>
+  <span className="neon-tag sm">{caption}</span>
+</header>
 
-    <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-      <input placeholder="RECOVER_CODE" value={recoverCode} onChange={(e) => setRecoverCode(e.target.value)} disabled={authOk} />
-      <button type="submit" disabled={authOk || !recoverCode.trim()}>Войти</button>
+    <hr className="neon-hr" />
+
+    <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+      <input
+        placeholder="RECOVER_CODE"
+        value={recoverCode}
+        onChange={(e) => setRecoverCode(e.target.value)}
+        disabled={authOk}
+      />
+      <button type="submit" className="neon-btn" disabled={authOk || !recoverCode.trim()}>
+        Войти
+      </button>
     </form>
 
-    <div
-      style={{
-        marginBottom: 0,
-        display: "flex",
-        gap: 0,
-        alignItems: "center",
-        flexWrap: "wrap"
-      }}
-    >
-      <button onClick={handleQuit}>Выход</button>
+    <div className="toolbar" style={{ marginBottom: 8 }}>
+      <button className="neon-btn" onClick={handleQuit}>Выход</button>
 
-      {/*таймеры*/}
+      {/* таймеры */}
       <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
         Engage (мс):
         <input
-          type="number" step="1" min="0"
+          type="number"
+          step="1"
+          min="0"
           value={delayEngageMs}
           onChange={(e) => setDelayEngageMs(Number(e.target.value) || 0)}
           style={{ width: 105 }}
@@ -454,7 +458,9 @@ return (
       <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
         Guard (мс):
         <input
-          type="number" step="1" min="0"
+          type="number"
+          step="1"
+          min="0"
           value={delayGuardMs}
           onChange={(e) => setDelayGuardMs(Number(e.target.value) || 0)}
           style={{ width: 105 }}
@@ -468,7 +474,7 @@ return (
 
       {/* --- Clans --- */}
       <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-        Кланы 
+        Кланы
         <input
           type="text"
           placeholder="US, GALA, TAURA"

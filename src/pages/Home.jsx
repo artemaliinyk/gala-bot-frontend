@@ -1,3 +1,11 @@
+import "../neon.css";
+
 export default function Home() {
-    return <h1>Главная страница</h1>
+  return (
+    <main className="full-center">
+<h1 className="neon-rainbow pulse-strong" data-text="By Youdonki ツ">
+  By Youdonki ツ
+</h1>
+    </main>
+  );
 }
