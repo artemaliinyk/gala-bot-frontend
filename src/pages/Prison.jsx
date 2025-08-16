@@ -41,10 +41,33 @@ function upsert(map, id, patch = {}) {
 }
 const show = (p) => `${p.clan ? `[${p.clan}]` : ""}${p.nick ?? "—"}`;
 
+/** === Persistent state hook (localStorage) === */
+function usePersistentState(key, initialValue) {
+  const [state, setState] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw !== null ? JSON.parse(raw) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {}
+  }, [key, state]);
+
+  return [state, setState];
+}
+
 /** ---- Bot ---- */
 function Bot({ label: caption }) {
   const client = useMemo(() => new Client({ url: WS_URL, ident: IDENT }), []);
   const clientRef = useRef(client);
+
+  /** Уникальный префикс настроек на вкладке для каждого бота */
+  const storagePrefix = `prison-bot:${caption || "default"}:`;
 
   const [log, setLog] = useState([]);
   const addLog = mkLogger(setLog);
@@ -55,11 +78,10 @@ function Bot({ label: caption }) {
   const [recoverCode, setRecoverCode] = useState("");
   const recoverRef = useRef("");
 
-  const [autoRun, setAutoRun] = useState(true);
-
- 
-  const [delayEngageMs, setDelayEngageMs] = useState(2000); 
-  const [delayGuardMs, setDelayGuardMs] = useState(1850);   
+  // persistable settings
+  const [autoRun, setAutoRun] = usePersistentState(storagePrefix + "autoRun", true);
+  const [delayEngageMs, setDelayEngageMs] = usePersistentState(storagePrefix + "delayEngageMs", 2000);
+  const [delayGuardMs, setDelayGuardMs] = usePersistentState(storagePrefix + "delayGuardMs", 1850);
 
   const [founderId, setFounderId] = useState(null);
   const [myId, setMyId] = useState(null);
@@ -67,8 +89,8 @@ function Bot({ label: caption }) {
   const [uiPlayers, setUiPlayers] = useState([]);
   const [lastShot, setLastShot] = useState(null);
 
- 
-  const [allowedClansInput, setAllowedClansInput] = useState("");
+  // whitelist clans (persist)
+  const [allowedClansInput, setAllowedClansInput] = usePersistentState(storagePrefix + "allowedClansInput", "");
   const allowedClansRef = useRef(new Set());
   useEffect(() => {
     const set = new Set(
@@ -80,6 +102,22 @@ function Bot({ label: caption }) {
     );
     allowedClansRef.current = set;
   }, [allowedClansInput]);
+
+  /** Опционально — синхронизация между вкладками */
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e.key || !e.key.startsWith(storagePrefix)) return;
+      try {
+        const val = JSON.parse(e.newValue);
+        if (e.key.endsWith("autoRun")) setAutoRun(val);
+        else if (e.key.endsWith("delayEngageMs")) setDelayEngageMs(val);
+        else if (e.key.endsWith("delayGuardMs")) setDelayGuardMs(val);
+        else if (e.key.endsWith("allowedClansInput")) setAllowedClansInput(val);
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [storagePrefix, setAutoRun, setDelayEngageMs, setDelayGuardMs, setAllowedClansInput]);
 
   /** Настройки в рефах */
   const settingsRef = useRef({ autoRun: true, delayEngageMs: 2000, delayGuardMs: 1850 });
@@ -419,87 +457,87 @@ function Bot({ label: caption }) {
     </li>
   );
 
-return (
-  <article className="neon-card neon-pulse" style={{ marginBottom: 16 }}>
-<header>
-  <span className="neon-tag sm">{caption}</span>
-</header>
+  return (
+    <article className="neon-card neon-pulse" style={{ marginBottom: 16 }}>
+      <header>
+        <span className="neon-tag sm">{caption}</span>
+      </header>
 
-    <hr className="neon-hr" />
+      <hr className="neon-hr" />
 
-    <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-      <input
-        placeholder="RECOVER_CODE"
-        value={recoverCode}
-        onChange={(e) => setRecoverCode(e.target.value)}
-        disabled={authOk}
-      />
-      <button type="submit" className="neon-btn" disabled={authOk || !recoverCode.trim()}>
-        Войти
-      </button>
-    </form>
-
-    <div className="toolbar" style={{ marginBottom: 8 }}>
-      <button className="neon-btn" onClick={handleQuit}>Выход</button>
-
-      {/* таймеры */}
-      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-        Engage (мс):
+      <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <input
-          type="number"
-          step="1"
-          min="0"
-          value={delayEngageMs}
-          onChange={(e) => setDelayEngageMs(Number(e.target.value) || 0)}
-          style={{ width: 105 }}
+          placeholder="RECOVER_CODE"
+          value={recoverCode}
+          onChange={(e) => setRecoverCode(e.target.value)}
+          disabled={authOk}
         />
-      </label>
+        <button type="submit" className="neon-btn" disabled={authOk || !recoverCode.trim()}>
+          Войти
+        </button>
+      </form>
 
-      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-        Guard (мс):
-        <input
-          type="number"
-          step="1"
-          min="0"
-          value={delayGuardMs}
-          onChange={(e) => setDelayGuardMs(Number(e.target.value) || 0)}
-          style={{ width: 105 }}
-        />
-      </label>
+      <div className="toolbar" style={{ marginBottom: 8 }}>
+        <button className="neon-btn" onClick={handleQuit}>Выход</button>
 
-      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-        <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
-        Авто-повтор заходов
-      </label>
+        {/* таймеры */}
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          Engage (мс):
+          <input
+            type="number"
+            step="1"
+            min="0"
+            value={delayEngageMs}
+            onChange={(e) => setDelayEngageMs(Number(e.target.value) || 0)}
+            style={{ width: 105 }}
+          />
+        </label>
 
-      {/* --- Clans --- */}
-      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-        Кланы
-        <input
-          type="text"
-          placeholder="US, GALA, TAURA"
-          value={allowedClansInput}
-          onChange={(e) => setAllowedClansInput(e.target.value)}
-          style={{ width: 260 }}
-        />
-      </label>
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          Guard (мс):
+          <input
+            type="number"
+            step="1"
+            min="0"
+            value={delayGuardMs}
+            onChange={(e) => setDelayGuardMs(Number(e.target.value) || 0)}
+            style={{ width: 105 }}
+          />
+        </label>
 
-      <ShotBadge />
-      <span>WS: {connected ? "connected" : "disconnected"} | AUTH: {authOk ? "OK" : "—"}</span>
-    </div>
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
+          Авто-повтор заходов
+        </label>
 
-    <div style={{ marginBottom: 8 }}>
-      <strong>Игроки (клан + ник):</strong>
-      <ul style={{ paddingLeft: 16 }}>
-        {uiPlayers.map((p) => (<RosterItem key={p.id} p={p} />))}
-      </ul>
-    </div>
+        {/* --- Clans --- */}
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          Кланы
+          <input
+            type="text"
+            placeholder="US, GALA, TAURA"
+            value={allowedClansInput}
+            onChange={(e) => setAllowedClansInput(e.target.value)}
+            style={{ width: 260 }}
+          />
+        </label>
 
-    <pre style={{ maxHeight: 260, overflow: "auto", background: "#111", color: "#0f0", padding: 8, borderRadius: 6 }}>
-      {log.join("\n")}
-    </pre>
-  </article>
-);
+        <ShotBadge />
+        <span>WS: {connected ? "connected" : "disconnected"} | AUTH: {authOk ? "OK" : "—"}</span>
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <strong>Игроки (клан + ник):</strong>
+        <ul style={{ paddingLeft: 16 }}>
+          {uiPlayers.map((p) => (<RosterItem key={p.id} p={p} />))}
+        </ul>
+      </div>
+
+      <pre style={{ maxHeight: 260, overflow: "auto", background: "#111", color: "#0f0", padding: 8, borderRadius: 6 }}>
+        {log.join("\n")}
+      </pre>
+    </article>
+  );
 }
 
 /** Render two independent bots */
