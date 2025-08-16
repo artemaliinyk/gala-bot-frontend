@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Client from "/src/client.jsx";
+import '@picocss/pico/css/pico.min.css';
 
 /** Connection + ident */
 const WS_URL = "wss://cs.mobstudio.ru:6672";
@@ -417,80 +418,90 @@ function Bot({ label: caption }) {
     </li>
   );
 
-  return (
-    <div style={{ border: "1px solid #333", borderRadius: 10, padding: 10, marginBottom: 14 }}>
-      <div style={{ fontWeight: 700, marginBottom: 6 }}>{caption}</div>
+return (
+  <article style={{ marginBottom: 16 }}>
+    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+      <strong>{caption}</strong>
+    </header>
 
-      <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <input placeholder="RECOVER_CODE" value={recoverCode} onChange={(e) => setRecoverCode(e.target.value)} disabled={authOk} />
-        <button type="submit" disabled={authOk || !recoverCode.trim()}>Войти</button>
-      </form>
+    <form onSubmit={handleLogin} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <input placeholder="RECOVER_CODE" value={recoverCode} onChange={(e) => setRecoverCode(e.target.value)} disabled={authOk} />
+      <button type="submit" disabled={authOk || !recoverCode.trim()}>Войти</button>
+    </form>
 
-      <div style={{ marginBottom: 8, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={handleQuit}>Выход</button>
+    <div
+      style={{
+        marginBottom: 0,
+        display: "flex",
+        gap: 0,
+        alignItems: "center",
+        flexWrap: "wrap"
+      }}
+    >
+      <button onClick={handleQuit}>Выход</button>
 
-        {/*таймеры */}
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          Engage (мс):
-          <input
-            type="number" step="1" min="0"
-            value={delayEngageMs}
-            onChange={(e) => setDelayEngageMs(Number(e.target.value) || 0)}
-            style={{ width: 90 }}
-          />
-        </label>
+      {/*таймеры*/}
+      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+        Engage (мс):
+        <input
+          type="number" step="1" min="0"
+          value={delayEngageMs}
+          onChange={(e) => setDelayEngageMs(Number(e.target.value) || 0)}
+          style={{ width: 105 }}
+        />
+      </label>
 
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          Guard (мс):
-          <input
-            type="number" step="1" min="0"
-            value={delayGuardMs}
-            onChange={(e) => setDelayGuardMs(Number(e.target.value) || 0)}
-            style={{ width: 90 }}
-          />
-        </label>
+      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+        Guard (мс):
+        <input
+          type="number" step="1" min="0"
+          value={delayGuardMs}
+          onChange={(e) => setDelayGuardMs(Number(e.target.value) || 0)}
+          style={{ width: 105 }}
+        />
+      </label>
 
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
-          Авто-повтор заходов
-        </label>
+      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+        <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} />
+        Авто-повтор заходов
+      </label>
 
-        {/* --- Clans --- */}
-        <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-          Кланы (через запятую):
-          <input
-            type="text"
-            placeholder="US, GALA, TAURA"
-            value={allowedClansInput}
-            onChange={(e) => setAllowedClansInput(e.target.value)}
-            style={{ width: 220 }}
-          />
-        </label>
+      {/* --- Clans --- */}
+      <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+        Кланы 
+        <input
+          type="text"
+          placeholder="US, GALA, TAURA"
+          value={allowedClansInput}
+          onChange={(e) => setAllowedClansInput(e.target.value)}
+          style={{ width: 260 }}
+        />
+      </label>
 
-        <ShotBadge />
-        <span>WS: {connected ? "connected" : "disconnected"} | AUTH: {authOk ? "OK" : "—"}</span>
-      </div>
-
-      <div style={{ marginBottom: 8 }}>
-        <strong>Игроки (клан + ник):</strong>
-        <ul style={{ paddingLeft: 16 }}>
-          {uiPlayers.map((p) => (<RosterItem key={p.id} p={p} />))}
-        </ul>
-      </div>
-
-      <pre style={{ maxHeight: 300, overflow: "auto", background: "#111", color: "#0f0", padding: 8 }}>
-        {log.join("\n")}
-      </pre>
+      <ShotBadge />
+      <span>WS: {connected ? "connected" : "disconnected"} | AUTH: {authOk ? "OK" : "—"}</span>
     </div>
-  );
+
+    <div style={{ marginBottom: 8 }}>
+      <strong>Игроки (клан + ник):</strong>
+      <ul style={{ paddingLeft: 16 }}>
+        {uiPlayers.map((p) => (<RosterItem key={p.id} p={p} />))}
+      </ul>
+    </div>
+
+    <pre style={{ maxHeight: 260, overflow: "auto", background: "#111", color: "#0f0", padding: 8, borderRadius: 6 }}>
+      {log.join("\n")}
+    </pre>
+  </article>
+);
 }
 
 /** Render two independent bots */
 export default function PrisonMulti() {
   return (
-    <div style={{ fontFamily: "monospace" }}>
+    <main style={{ fontFamily: "monospace", maxWidth: "960px", margin: "0 auto", padding: "12px" }}>
       <Bot label="Bot 1" />
       <Bot label="Bot 2" />
-    </div>
+    </main>
   );
 }
